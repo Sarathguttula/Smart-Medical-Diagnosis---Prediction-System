@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pulsewise | Health Screening</title>
+  <style>
+    :root { --ink:#172026; --muted:#66747b; --paper:#f4f1ea; --card:#fffdf8; --teal:#087f75; --coral:#df694f; --line:#d8d5cb; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:radial-gradient(circle at 80% 0%, #dcebe4 0, transparent 30%), var(--paper); font:16px Georgia, serif; }
+    main { max-width:1080px; margin:auto; padding:36px 22px 54px; } header { display:flex; justify-content:space-between; align-items:start; gap:24px; margin-bottom:40px; } .eyebrow { color:var(--coral); text-transform:uppercase; letter-spacing:.14em; font:700 12px Arial,sans-serif; } h1 { font-size:clamp(38px, 7vw, 76px); line-height:.95; max-width:650px; margin:10px 0; font-weight:500; } .intro { color:var(--muted); max-width:430px; line-height:1.5; margin-top:16px; } .status { color:var(--teal); font:700 12px Arial,sans-serif; border:1px solid #8fc7b7; padding:9px 12px; border-radius:999px; white-space:nowrap; }
+    .layout { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(290px,.85fr); gap:22px; align-items:start; } section { background:var(--card); border:1px solid var(--line); padding:25px; box-shadow:0 12px 30px #5a675b0e; } h2 { font-size:26px; font-weight:500; margin:0 0 7px; } .hint { color:var(--muted); margin:0 0 22px; font:14px Arial,sans-serif; } #symptoms { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; } label { display:flex; align-items:center; gap:9px; padding:12px 11px; border:1px solid var(--line); cursor:pointer; font:14px Arial,sans-serif; transition:.2s; } label:has(input:checked) { border-color:var(--teal); background:#e2f1eb; color:var(--teal); } input { accent-color:var(--teal); } button { margin-top:22px; width:100%; border:0; padding:15px; background:var(--teal); color:white; font:700 14px Arial,sans-serif; cursor:pointer; } button:hover { background:#06685f; } #results { min-height:240px; } .empty { color:var(--muted); line-height:1.5; } .result { border-top:1px solid var(--line); padding:17px 0; } .result:first-child { border-top:0; padding-top:0; } .result-head { display:flex; justify-content:space-between; gap:12px; } .disease { font-size:23px; } .score { color:var(--teal); font:bold 18px Arial,sans-serif; } .bar { height:8px; background:#e8e5dc; margin:10px 0 12px; } .bar span { display:block; height:100%; background:var(--coral); } .risk { display:inline-block; font:700 11px Arial,sans-serif; text-transform:uppercase; letter-spacing:.08em; color:var(--coral); } .details { color:var(--muted); font:13px Arial,sans-serif; line-height:1.5; } footer { margin-top:22px; color:var(--muted); font:12px Arial,sans-serif; line-height:1.5; } @media (max-width:760px) { header { display:block; } .status { display:inline-block; margin-top:16px; } .layout { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <header><div><div class="eyebrow">Pulsewise / screening studio</div><h1>A clearer read on your symptoms.</h1><p class="intro">Select what you are experiencing to see a ranked, explainable screening estimate and practical next steps.</p></div><div class="status">● API ready</div></header>
+  <div class="layout">
+    <section><h2>What are you feeling?</h2><p class="hint">Choose every symptom that applies.</p><div id="symptoms">Loading symptoms...</div><button id="predict">Generate screening</button></section>
+    <section><h2>Screening signal</h2><p class="hint">A probability estimate, not a diagnosis.</p><div id="results" class="empty">Your results will appear here after you select symptoms.</div></section>
+  </div>
+  <footer>Educational use only. This tool does not provide medical advice and cannot replace a qualified healthcare professional. For emergencies, contact local emergency services.</footer>
+</main>
+<script>
+const symptomBox = document.querySelector('#symptoms');
+const results = document.querySelector('#results');
+const pretty = value => value.replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase());
+fetch('/api/symptoms').then(response => response.json()).then(data => {
+  symptomBox.innerHTML = data.symptoms.map(symptom => `<label><input type="checkbox" value="${symptom}">${pretty(symptom)}</label>`).join('');
+}).catch(() => symptomBox.textContent = 'Unable to load symptoms. Is the API running?');
+document.querySelector('#predict').addEventListener('click', async () => {
+  const symptoms = [...document.querySelectorAll('input:checked')].map(input => input.value);
+  if (!symptoms.length) { results.innerHTML = '<p class="empty">Select at least one symptom to begin.</p>'; return; }
+  results.innerHTML = '<p class="empty">Calculating screening signal...</p>';
+  const response = await fetch('/api/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({symptoms}) });
+  const data = await response.json();
+  results.innerHTML = data.predictions.map(item => `<div class="result"><div class="result-head"><div class="disease">${item.disease}</div><div class="score">${Math.round(item.probability * 100)}%</div></div><div class="bar"><span style="width:${item.probability * 100}%"></span></div><div class="risk">${item.risk_level} signal</div><p class="details"><b>Why:</b> ${item.explanation.map(reason => `${pretty(reason.symptom)} (${reason.impact >= 0 ? '+' : ''}${reason.impact})`).join(', ')}<br><b>Next:</b> ${item.recommendations.join(' ')}</p></div>`).join('');
+});
+</script>
+</body>
+</html>
